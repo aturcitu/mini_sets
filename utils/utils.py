@@ -10,28 +10,28 @@ import os
 from shutil import copyfile
 import random
 
-import multiprocessing
+import multiprocessing 
 import subprocess
 
 
-def prepare_clip_zero_shoot(data, ds_path):
+def prepare_clip_zero_shoot(data, ds_path, frame_num = 5):
     classes = []
     clip_tuple = []
     for video_key, obj_info  in data.items():
             class_label = obj_info['label']
             if class_label not in classes:
                 classes.append(class_label)
-            clip_tuple.append([join(ds_path, class_label, video_key)+'_5.png', class_label])
+            clip_tuple.append([join(ds_path, class_label, video_key)+'_'+str(frame_num)+'.png', class_label])
     return clip_tuple, classes
 
-
+ 
 def create_ds_tuple(data, tuple_length = 3):
     tuple = {}
     classes = []
     i = 0
     while(i<tuple_length):       
         random_key, random_obj = random.choice(list(data.items()))
-        class_label = data[random_key]['label']
+        class_label = data[random_key]['label'] 
         if class_label not in classes:
             classes.append(class_label)
             tuple.update({random_key: random_obj})
@@ -49,18 +49,6 @@ def prepare_clip_tuple(data, ds_path, test_length = 3):
                 clip_tuple.append([join(ds_path, class_label,video_key)+'_5.png',class_label])
         test_clip_tuple.append(clip_tuple)
     return test_clip_tuple
-
-
-def transport_ds(data, ds_path, download_path = '../../datasets/mini_sounds_lite'):
-    if not exists(ds_path):
-        os.mkdir(join(ds_path))
-    for video_id, video_obj in tqdm(data.items(), desc="placing ds"):
-        class_label = video_obj['label']
-        if not exists(join(ds_path, class_label)):
-            os.mkdir(join(ds_path, class_label)) 
-        for file_image in os.listdir(join(download_path, class_label)):
-            if (not file_image.endswith('.mp4')) and (not file_image.endswith('.mp3')):
-                copyfile(join(download_path, class_label, file_image),join(ds_path, class_label, file_image))
 
 
 def build_test_dataset(data, delete_data, samples_class = 3):
@@ -98,7 +86,7 @@ def update_data(data, video_id, start, label, split):
 
     return data
 
-def get_frames(data, video_length = 10, download_path = '../../datasets/mini_sounds'):
+def get_frames(data, download_path, video_length):
     for video_id, video_obj in tqdm(data.items(), desc="Extracting frames from video"):
         get_frames_en = 0
         class_label = video_obj['label']
@@ -109,19 +97,22 @@ def get_frames(data, video_length = 10, download_path = '../../datasets/mini_sou
         
         if get_frames_en: 
             video_path = join(download_path, class_label, video_id)+'.mp4'
-            video = mp.VideoFileClip(video_path)
-            #video_length = video.duration
-            """for file_image in os.listdir(join(download_path, class_label)):
-                if file_image.startswith(video_id):
-                    if file_image.endswith('.png'):
-                        os.remove(join(download_path, class_label, file_image)) """
-            for t in range(int(video_length)):
-                frame_path = join(download_path, class_label, video_id)+'_'+str(t)+'.png'
-                if not exists(frame_path):
-                    try:
-                        video.save_frame(frame_path, t = t)
-                    except:
-                        print('frame:',frame_path,'failed.')    
+            try:
+                video = mp.VideoFileClip(video_path)
+            except OSError:
+                try:
+                    os.remove(video_path)
+                    print('Delete:',video_path)
+                except FileNotFoundError:
+                    print('Not Found:',video_path)
+            else:
+                for t in range(int(video_length)):
+                    frame_path = join(download_path, class_label, video_id)+'_'+str(t)+'.png'
+                    if not exists(frame_path):
+                        try:
+                            video.save_frame(frame_path, t = t)
+                        except OSError:
+                            print('frame:',frame_path,'failed.')    
 
 def convert(v):
     subprocess.check_call([
@@ -134,7 +125,7 @@ def convert(v):
     '%s.wav' % v[:-4]])
   
 
-def get_audio(data, download_path = '../../datasets/mini_sounds'):
+def get_audio(data, download_path):
     files = []
     for video_id, video_obj in tqdm(data.items(), desc="Extracting audio from video"):
         class_label = video_obj['label']
@@ -148,7 +139,7 @@ def get_audio(data, download_path = '../../datasets/mini_sounds'):
     p.map(convert, files)
 
 
-def get_video(data, download_path = '../../datasets/mini_sounds', seconds_long = 10):
+def get_video(data, download_path, seconds_long):
     to_remove = {}
     
     youtube_path = 'https://www.youtube.com/watch?v='
